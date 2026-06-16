@@ -1,6 +1,6 @@
 """
 skin_tone_detection.py
-Detects skin tone from a user selfie using MediaPipe Face Mesh.
+Detects skin tone from a user selfie using MediaPipe Face Landmarker (Tasks API).
 Samples forehead and cheek regions, averages the pixel values, and
 maps them to a Fitzpatrick scale type + hex color.
 """
@@ -8,8 +8,12 @@ maps them to a Fitzpatrick scale type + hex color.
 import cv2
 import numpy as np
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+from pathlib import Path
 
-mp_face_mesh = mp.solutions.face_mesh
+# Path to the face landmarker model bundle
+_MODEL_PATH = str(Path(__file__).parent.parent / "data" / "face_landmarker.task")
 
 # Fitzpatrick scale ranges (based on lightness in LAB color space)
 FITZPATRICK_SCALE = [
@@ -27,10 +31,11 @@ LEFT_CHEEK_LANDMARKS = [50, 101, 118, 117, 116]
 RIGHT_CHEEK_LANDMARKS = [280, 330, 347, 346, 345]
 
 
-def _sample_region(image: np.ndarray, landmarks, lm_list: list[int]) -> np.ndarray:
+def _sample_region(image: np.ndarray, landmark_indices: list[int], landmarks) -> np.ndarray:
+    """Sample pixels from a face region defined by landmark indices."""
     h, w = image.shape[:2]
     pts = np.array(
-        [(int(lm_list[i].x * w), int(lm_list[i].y * h)) for i in landmarks],
+        [(int(landmarks[i].x * w), int(landmarks[i].y * h)) for i in landmark_indices],
         dtype=np.int32,
     )
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
@@ -68,15 +73,18 @@ def detect_skin_tone(image_bytes: bytes) -> dict:
     image_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
-    with mp_face_mesh.FaceMesh(
-        static_image_mode=True,
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-    ) as face_mesh:
-        results = face_mesh.process(image_rgb)
+    # Create FaceLandmarker with the Tasks API
+    base_options = python.BaseOptions(model_asset_path=_MODEL_PATH)
+    options = vision.FaceLandmarkerOptions(
+        base_options=base_options,
+        num_faces=1,
+    )
 
-    if not results.multi_face_landmarks:
+    with vision.FaceLandmarker.create_from_options(options) as landmarker:
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+        results = landmarker.detect(mp_image)
+
+    if not results.face_landmarks:
         return {
             "hex": "#c68642",
             "rgb": [198, 134, 66],
@@ -86,7 +94,7 @@ def detect_skin_tone(image_bytes: bytes) -> dict:
             "error": "No face detected — using default skin tone",
         }
 
-    lm = results.multi_face_landmarks[0].landmark
+    lm = results.face_landmarks[0]
 
     all_pixels = []
     for region in [FOREHEAD_LANDMARKS, LEFT_CHEEK_LANDMARKS, RIGHT_CHEEK_LANDMARKS]:
@@ -114,3 +122,4 @@ def detect_skin_tone(image_bytes: bytes) -> dict:
         "fitzpatrick_label": fitzpatrick["label"],
         "lab_L": round(L_normalized, 2),
     }
+

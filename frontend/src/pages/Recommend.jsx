@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { useAuth } from '../context/AuthContext'
 import { getRecommendations, imageUrl } from '../utils/api'
 
 const OCCASIONS = ['casual', 'office', 'wedding', 'party', 'gym', 'beach', 'date', 'festival', 'formal']
@@ -97,7 +98,8 @@ function OutfitCard({ outfit, rank }) {
 }
 
 export default function Recommend() {
-  const userId = localStorage.getItem('fitcheck_user_id') || 'guest'
+  const { user } = useAuth()
+  const userId = user.uid
   const skinTone = localStorage.getItem('fitcheck_skin_tone') || '#c68642'
   const [occasion, setOccasion] = useState('')
   const [styleNote, setStyleNote] = useState('')

@@ -1,6 +1,6 @@
 # FitCheck.ai
 
-> Your personal AI style assistant — outfit recommendations from your own wardrobe, matched to your skin tone and occasion.
+> Your personal AI style assistant — outfit recommendations from your own wardrobe, matched to your skin tone and occasion. Secured with **Google Firebase Authentication**.
 
 ---
 
@@ -10,10 +10,11 @@ Upload your clothes once. Tell FitCheck.ai where you're going. Get outfit combin
 
 **How it works under the hood:**
 
-1. **Selfie → skin tone** — MediaPipe detects your face, samples forehead and cheek pixels, maps to Fitzpatrick scale
-2. **Photo → clothing features** — OpenCV KMeans extracts dominant colors; a vision + label classifier detects category (top / bottom / shoes / dress / outerwear)
-3. **Features → vectors** — `sentence-transformers` embeds occasion tags and style labels into a 387-dim vector stored in ChromaDB
-4. **Occasion → outfits** — query vector finds the closest items per category; outfit builder ranks combos by vector similarity + skin compatibility + color harmony + occasion match
+1. **Google sign-in** — Firebase Authentication handles user identity via Google OAuth popup
+2. **Selfie → skin tone** — MediaPipe FaceLandmarker (Tasks API) detects your face, samples forehead and cheek pixels, maps to Fitzpatrick scale
+3. **Photo → clothing features** — OpenCV KMeans extracts dominant colors; a vision + label classifier detects category (top / bottom / shoes / dress / outerwear)
+4. **Features → vectors** — `sentence-transformers` embeds occasion tags and style labels into a 387-dim vector stored in ChromaDB
+5. **Occasion → outfits** — query vector finds the closest items per category; outfit builder ranks combos by vector similarity + skin compatibility + color harmony + occasion match
 
 ---
 
@@ -25,25 +26,31 @@ fitcheck-ai/
 │   ├── main.py                     # All API routes
 │   ├── requirements.txt
 │   ├── Dockerfile
+│   ├── data/
+│   │   ├── face_landmarker.task    # MediaPipe face model bundle
+│   │   ├── chromadb/               # vector store (persisted)
+│   │   └── uploads/                # clothing photos
 │   ├── scripts/
 │   │   ├── dominant_color.py       # OpenCV KMeans color extraction
-│   │   ├── skin_tone_detection.py  # MediaPipe + Fitzpatrick scale
+│   │   ├── skin_tone_detection.py  # MediaPipe FaceLandmarker (Tasks API) + Fitzpatrick scale
 │   │   └── clothing_classifier.py  # top / bottom / shoes detection
 │   ├── recommendation/
 │   │   ├── embeddings.py           # features → 387-dim vector
 │   │   ├── vectorstore.py          # ChromaDB read/write
 │   │   └── outfit_builder.py       # combo ranking + scoring
-│   └── data/                       # auto-created at runtime
-│       ├── chromadb/               # vector store (persisted)
-│       └── uploads/                # clothing photos
+│   └── startup_check.py            # environment verification
 ├── frontend/                       # React + Vite + Tailwind
 │   ├── src/
-│   │   ├── main.jsx                # entry point
-│   │   ├── App.jsx                 # routing + nav
+│   │   ├── main.jsx                # entry point (wrapped with AuthProvider)
+│   │   ├── App.jsx                 # routing + nav + auth gate
+│   │   ├── lib/
+│   │   │   └── firebase.js         # Firebase config + Google Auth
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx     # React auth context (useAuth hook)
 │   │   ├── pages/
-│   │   │   ├── Onboard.jsx         # profile + skin tone setup
-│   │   │   ├── Wardrobe.jsx        # upload + manage clothes
-│   │   │   └── Recommend.jsx       # occasion → outfit results
+│   │   │   ├── Onboard.jsx         # profile + skin tone setup (uses Firebase UID)
+│   │   │   ├── Wardrobe.jsx        # upload + manage clothes (uses Firebase UID)
+│   │   │   └── Recommend.jsx       # occasion → outfit results (uses Firebase UID)
 │   │   └── utils/api.js            # axios calls to backend
 │   ├── Dockerfile
 │   └── nginx.conf                  # SPA routing + API proxy
@@ -87,6 +94,37 @@ Your wardrobe data and uploaded photos persist across restarts via Docker named 
 
 ---
 
+## Authentication
+
+FitCheck.ai uses **Google Firebase Authentication** for secure user sign-in.
+
+### How it works
+
+1. Users click **"Sign in with Google"** on the landing page
+2. A Google OAuth popup handles authentication
+3. On success, the app uses the Firebase `user.uid` as the unique identifier for all backend API calls (wardrobe, recommendations, profile)
+4. The nav bar displays the user's Google profile picture, name, and a sign-out button
+
+### Firebase project
+
+| Setting | Value |
+|---------|-------|
+| Project ID | `fitcheckai-504db` |
+| Auth provider | Google (popup flow) |
+| SDK | Firebase JS SDK v12+ |
+
+### Key files
+
+| File | Purpose |
+|------|--------|
+| `frontend/src/lib/firebase.js` | Firebase app init + Google Auth provider |
+| `frontend/src/context/AuthContext.jsx` | React context providing `useAuth()` hook |
+| `frontend/src/App.jsx` | Auth gate — renders sign-in page or app |
+
+> **Setup:** Make sure Google sign-in is enabled in [Firebase Console](https://console.firebase.google.com/) → Authentication → Sign-in method → Google.
+
+---
+
 ## Local development setup
 
 ### Backend
@@ -120,11 +158,15 @@ cd frontend
 # Install dependencies
 npm install
 
-# Start dev server (proxies /api/* to backend:8000)
+# Build frontend (outputs to backend/static/dist/)
+npm run build
+
+# Or start dev server (proxies /api/* to backend:8000)
 npm run dev
 ```
 
-App available at: **http://localhost:5173**
+Dev server available at: **http://localhost:5173**  
+Unified app (backend serves built frontend): **http://localhost:8000**
 
 > Both backend and frontend must be running together for the full app to work.
 
@@ -228,8 +270,9 @@ Copy `.env.example` to `.env` and configure:
 | Layer | Technology |
 |-------|------------|
 | Frontend | React 18, Vite, Tailwind CSS, Framer Motion |
+| Authentication | Firebase Authentication (Google OAuth) |
 | Backend | FastAPI, Python 3.11 |
-| Computer vision | OpenCV, MediaPipe |
+| Computer vision | OpenCV, MediaPipe (Tasks API — FaceLandmarker) |
 | NLP / embeddings | sentence-transformers (`all-MiniLM-L6-v2`) |
 | Vector database | ChromaDB (cosine similarity) |
 | Containerisation | Docker, docker-compose, nginx |
@@ -243,6 +286,7 @@ Interface screenshots (add files under `docs/screenshots/`):
 
 | Screen | Screenshot |
 |---|---|
+| Google Sign-in | ![Sign-in](docs/screenshots/signin.png) |
 | Onboarding | ![Onboarding](docs/screenshots/onboard.png) |
 | Wardrobe | ![Wardrobe](docs/screenshots/wardrobe.png) |
 | Recommendation | ![Recommendation](docs/screenshots/recommend.png) |
@@ -256,8 +300,9 @@ Interface screenshots (add files under `docs/screenshots/`):
 - [x] Frontend — React Digital Closet UI (3 pages)
 - [x] Docker + docker-compose setup
 - [x] Integration test suite (78 tests)
+- [x] User authentication — Google sign-in via Firebase
+- [x] MediaPipe migration — upgraded to Tasks API (FaceLandmarker)
 - [ ] Mobile app — React Native (iOS + Android)
-- [ ] User authentication
 - [ ] Outfit history + favourites
 - [ ] Style trend suggestions using NLP on fashion data
 - [ ] Body type fit recommendations
