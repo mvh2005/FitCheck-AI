@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { useAuth } from '../context/AuthContext'
 import { onboardUser } from '../utils/api'
 
 const GENDERS = ['Male', 'Female', 'Non-binary']
@@ -11,7 +10,7 @@ const BODY_TYPES = ['Slim', 'Athletic', 'Average', 'Plus']
 
 export default function Onboard() {
   const nav = useNavigate()
-  const { user } = useAuth()
+  const [userId, setUserId] = useState('')
   const [gender, setGender] = useState('')
   const [bodyType, setBodyType] = useState('')
   const [selfie, setSelfie] = useState(null)
@@ -28,12 +27,13 @@ export default function Onboard() {
   })
 
   const handleSubmit = async () => {
+    if (!userId.trim()) return toast.error('Enter a user ID')
     if (!gender) return toast.error('Select your gender')
     if (!bodyType) return toast.error('Select your body type')
     if (!selfie) return toast.error('Upload a selfie for skin tone detection')
 
     const fd = new FormData()
-    fd.append('user_id', user.uid)
+    fd.append('user_id', userId.trim())
     fd.append('gender', gender.toLowerCase())
     fd.append('body_type', bodyType.toLowerCase())
     fd.append('selfie', selfie)
@@ -41,9 +41,9 @@ export default function Onboard() {
     setLoading(true)
     try {
       const { data } = await onboardUser(fd)
-      localStorage.setItem('fitcheck_user_id', user.uid)
+      localStorage.setItem('fitcheck_user_id', data.user_id)
       localStorage.setItem('fitcheck_skin_tone', data.skin_tone?.hex || '#c68642')
-      toast.success(`Welcome, ${user.displayName?.split(' ')[0]}! Skin tone detected: ${data.skin_tone?.fitzpatrick_label}`)
+      toast.success(`Welcome! Skin tone detected: ${data.skin_tone?.fitzpatrick_label}`)
       setTimeout(() => nav('/wardrobe'), 1200)
     } catch {
       toast.error('Onboarding failed — is the backend running?')
@@ -58,31 +58,27 @@ export default function Onboard() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <p className="text-xs tracking-widest uppercase text-mink mb-3">Personal style assistant</p>
         <h1 className="font-display text-5xl leading-tight text-charcoal mb-4">
-          Welcome,<br /><em>{user.displayName?.split(' ')[0] || 'there'}</em>.
+          Dress for<br /><em>every</em> occasion.
         </h1>
         <p className="text-slate text-base leading-relaxed mb-12 max-w-md">
-          Let's set up your style profile. Upload a selfie so we can detect your skin tone,
-          then build your digital wardrobe.
+          Upload your wardrobe once. Get outfit recommendations from your own clothes,
+          matched to your skin tone and the occasion.
         </p>
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
         className="space-y-8">
 
-        {/* Signed-in user info */}
-        <div className="flex items-center gap-3 p-4 bg-white border border-stone-200">
-          {user.photoURL && (
-            <img
-              src={user.photoURL}
-              alt=""
-              className="w-10 h-10 rounded-full border border-stone-200"
-              referrerPolicy="no-referrer"
-            />
-          )}
-          <div>
-            <p className="text-sm font-medium text-charcoal">{user.displayName}</p>
-            <p className="text-xs text-stone-400">{user.email}</p>
-          </div>
+        {/* User ID */}
+        <div>
+          <label className="block text-xs tracking-widest uppercase text-slate mb-2">Your name or ID</label>
+          <input
+            value={userId}
+            onChange={e => setUserId(e.target.value)}
+            placeholder="e.g. priya_2024"
+            className="w-full border border-stone-300 bg-white px-4 py-3 text-sm text-charcoal
+                       focus:outline-none focus:border-mink placeholder-stone-400 transition-colors"
+          />
         </div>
 
         {/* Gender */}

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { useAuth } from '../context/AuthContext'
 import { addWardrobeItem, getWardrobe, deleteWardrobeItem, imageUrl } from '../utils/api'
 
 const OCCASIONS = ['casual', 'office', 'wedding', 'party', 'gym', 'beach', 'date', 'festival', 'formal']
@@ -17,8 +16,7 @@ const CATEGORY_COLORS = {
 }
 
 export default function Wardrobe() {
-  const { user } = useAuth()
-  const userId = user.uid
+  const userId = localStorage.getItem('fitcheck_user_id') || 'guest'
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
