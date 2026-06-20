@@ -63,8 +63,10 @@ export default function Onboard() {
       const { data } = await onboardUser(fd)
       localStorage.setItem('fitcheck_user_id', data.user_id)
       localStorage.setItem('fitcheck_skin_tone', data.skin_tone?.hex || '#c68642')
-      toast.success(`You're in! Skin tone: ${data.skin_tone?.fitzpatrick_label} 🎉`)
-      setTimeout(() => nav('/wardrobe'), 1200)
+      localStorage.setItem('fitcheck_gender', gender.toLowerCase())
+      localStorage.setItem('fitcheck_body_type', bodyType.toLowerCase())
+      toast.success(`Profile set! Skin tone: ${data.skin_tone?.fitzpatrick_label} 🎉`)
+      setTimeout(() => nav('/dashboard'), 1200)
     } catch {
       toast.error('Something glitched — is the backend up? 🤔')
     } finally {

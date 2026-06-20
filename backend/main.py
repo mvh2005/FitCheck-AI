@@ -15,6 +15,7 @@ On startup:
 
 import os
 import sys
+import json
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -24,6 +25,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 import uuid
+
+from dotenv import load_dotenv
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR    = Path(__file__).parent
@@ -233,6 +239,97 @@ def get_profile(user_id: str):
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found. Please onboard first.")
     return profile
+
+
+# ── AI: Random Outfit via Gemini Vision ───────────────────────────────────────
+
+MOCK_OUTFIT = {
+    "concept": "Effortless Street Chic",
+    "items": {
+        "top": "White oversized linen shirt (relaxed fit)",
+        "bottom": "High-waist wide-leg trousers in warm camel",
+        "shoes": "White leather chunky platform sneakers",
+        "accessory": "Gold chain necklace + tan mini crossbody bag",
+    },
+    "colors": ["#FFFFFF", "#C4A882", "#F5F5F0", "#D4AF37"],
+    "vibe": "Minimal, elevated streetwear with a clean neutral palette — effortless but intentional",
+    "occasions": ["casual", "brunch", "shopping", "city walk", "coffee date"],
+    "tip": "Tuck in the shirt halfway for a lived-in, editorial vibe. Add a structured blazer for evening.",
+    "mock": True,
+}
+
+@app.post("/api/ai/random-outfit")
+async def ai_random_outfit(
+    image:      UploadFile = File(...),
+    style_hint: str = Form(""),
+    gender:     str = Form(""),
+    body_type:  str = Form(""),
+):
+    image_bytes = await read_upload(image)
+
+    # If no API key, return rich mock response so the feature always works
+    if not GEMINI_API_KEY:
+        log.info("GEMINI_API_KEY not set — returning demo outfit response")
+        return MOCK_OUTFIT
+
+    try:
+        import google.generativeai as genai
+        from PIL import Image as PILImage
+        import io
+
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        context_parts = []
+        if style_hint:  context_parts.append(f"Style preference: {style_hint}")
+        if gender:      context_parts.append(f"Gender: {gender}")
+        if body_type:   context_parts.append(f"Body type: {body_type}")
+        context_str = "\n".join(context_parts)
+
+        prompt = f"""You are a world-class fashion stylist. Analyze this image and create a complete, stylish outfit suggestion.
+{context_str}
+
+Return ONLY valid JSON (no markdown, no code fences):
+{{
+  "concept": "creative outfit concept name",
+  "items": {{
+    "top": "specific top with fabric/fit details",
+    "bottom": "specific bottom with fit details",
+    "shoes": "specific shoes",
+    "accessory": "accessories and extras"
+  }},
+  "colors": ["#hex1", "#hex2", "#hex3", "#hex4"],
+  "vibe": "descriptive mood and aesthetic of the outfit",
+  "occasions": ["occasion1", "occasion2", "occasion3"],
+  "tip": "one specific styling tip to elevate the look"
+}}"""
+
+        img = PILImage.open(io.BytesIO(image_bytes))
+        response = model.generate_content([prompt, img])
+        text = response.text.strip()
+
+        # Strip markdown code fences if present
+        if "```" in text:
+            parts = text.split("```")
+            for p in parts:
+                p = p.strip()
+                if p.startswith("json"):
+                    p = p[4:].strip()
+                try:
+                    result = json.loads(p)
+                    return result
+                except json.JSONDecodeError:
+                    continue
+
+        result = json.loads(text)
+        return result
+
+    except json.JSONDecodeError as e:
+        log.error(f"Gemini JSON parse error: {e}")
+        return {**MOCK_OUTFIT, "mock": True, "error": "AI returned unexpected format"}
+    except Exception as e:
+        log.error(f"Gemini API error: {e}")
+        return {**MOCK_OUTFIT, "mock": True, "error": str(e)}
 
 
 # ── Serve React SPA (must be LAST) ────────────────────────────────────────────
