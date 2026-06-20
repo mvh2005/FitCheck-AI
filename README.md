@@ -1,25 +1,47 @@
 # FitCheck.AI
 
+
+
 > Your personal AI style assistant — outfit recommendations from your own wardrobe, matched to your skin tone and occasion.
 
+
+
 ---
+
+
 
 ## What it does
 
+
+
 Upload your clothes once. Tell FitCheck.ai where you're going. Get outfit combinations — top + bottom + shoes — picked from your actual wardrobe, scored for color harmony and skin tone compatibility.
+
+
 
 **How it works under the hood:**
 
+
+
 1. **Selfie → skin tone** — MediaPipe detects your face, samples forehead and cheek pixels, maps to Fitzpatrick scale
+
 2. **Photo → clothing features** — OpenCV KMeans extracts dominant colors; a vision + label classifier detects category (top / bottom / shoes / dress / outerwear)
+
 3. **Features → vectors** — `sentence-transformers` embeds occasion tags and style labels into a 387-dim vector stored in ChromaDB
+
 4. **Occasion → outfits** — query vector finds the closest items per category; outfit builder ranks combos by vector similarity + skin compatibility + color harmony + occasion match
+
+
 
 ---
 
+
+
 ## Project structure
 
+
+
 ```
+
 fitcheck-ai/
 ├── backend/                        # FastAPI + Python ML stack
 │   ├── main.py                     # All API routes
@@ -55,81 +77,222 @@ fitcheck-ai/
 ├── docker-compose.yml              # run everything with one command
 ├── .env.example                    # environment variable template
 └── pytest.ini
+
 ```
 
+
+
 ---
+
+
 
 ## Quick start — Docker (recommended)
 
+
+
 **Requirements:** Docker + Docker Compose
 
+
+
 ```bash
+
 # 1. Clone the repo
+
 git clone https://github.com/your-username/fitcheck-ai.git
+
 cd fitcheck-ai
 
+
+
 # 2. Set up environment
+
 cp .env.example .env
 
+
+
 # 3. Build and start
+
 docker-compose up --build
+
 ```
 
-App is live at **http://localhost**  
+
+
+App is live at **http://localhost:5173**  
+
+
 
 To stop:
+
 ```bash
+
 docker-compose down
+
 ```
+
+
 
 Your wardrobe data and uploaded photos persist across restarts via Docker named volumes.
 
+
+
 ---
+
+
 
 ## Local development setup
 
+
+
 ### Backend
+
+
 
 **Requirements:** Python 3.11+
 
+
+
 ```bash
+
 cd backend
 
+
+
 # Create virtual environment
+
 python -m venv venv
+
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
+
+
 # Install dependencies
+
 pip install -r requirements.txt
 
+
+
 # Start the API server
-uvicorn main:app --reload --port 8000
+
+uvicorn main:app --reload --port 5173
+
 ```
 
+
+
 API available at: **http://localhost:8000**  
+
 Interactive docs: **http://localhost:8000/docs**
+
+
 
 ### Frontend
 
+
+
 **Requirements:** Node.js 20+
 
+
+
 ```bash
+
 cd frontend
 
+
+
 # Install dependencies
+
 npm install
 
+
+
 # Start dev server (proxies /api/* to backend:8000)
+
 npm run dev
+
 ```
+
+
 
 App available at: **http://localhost:5173**
 
-> Both backend and frontend must be running together for the full app to work.
+
+
+> **Important:** Both backend and frontend must be running together for the full app to work.
+
+
 
 ---
 
+
+
+## Quick reference — common commands
+
+
+
+### Run everything at once (Docker)
+
+```bash
+
+docker-compose up --build
+
+```
+
+
+
+### Local development (open 2 terminals)
+
+
+
+**Terminal 1 — Backend:**
+
+```bash
+
+cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000
+
+```
+
+
+
+**Terminal 2 — Frontend:**
+
+```bash
+
+cd frontend && npm run dev
+
+```
+
+
+
+---
+
+
+
+## Troubleshooting
+
+
+
+| Issue | Solution |
+|-------|----------|
+| `ModuleNotFoundError` in backend | Ensure Python 3.11+ is installed. Run `python --version` and verify venv is activated. |
+| `npm: command not found` | Install Node.js 20+ from [nodejs.org](https://nodejs.org) |
+| Port 8000 already in use | Kill process: `lsof -ti:8000 \| xargs kill -9` (macOS/Linux) or use `netstat -ano` (Windows) |
+| Port 5173 already in use | Vite will auto-increment to 5174; check terminal output for actual port |
+| ChromaDB connection error | Delete `/data/chromadb` directory and restart; data will regenerate on first upload |
+| CORS errors in frontend | Verify `ALLOWED_ORIGINS` in `.env` includes `http://localhost:5173` |
+| Clothes not uploading | Check `MAX_UPLOAD_MB` in `.env` (default: 20MB); image must be under limit |
+| MediaPipe skin detection fails | Ensure image has clear, well-lit face; try different lighting or angle |
+| Venv activation issues (Windows) | Run: `venv\Scripts\activate.bat` instead of the bash version |
+
+
+
+---
+
+
+
 ## API reference
+
+
 
 | Method | Route | Description |
 |--------|-------|-------------|
@@ -141,62 +304,121 @@ App available at: **http://localhost:5173**
 | `POST` | `/recommend` | Get outfit combos for an occasion |
 | `GET` | `/profile/{user_id}` | Get user body profile |
 
+
+
 ### Example: onboard a user
 
+
+
 ```bash
+
 curl -X POST http://localhost:8000/onboard \
+
   -F "user_id=priya" \
+
   -F "gender=female" \
+
   -F "body_type=athletic" \
+
   -F "selfie=@/path/to/selfie.jpg"
+
 ```
+
+
 
 ### Example: add a clothing item
 
+
+
 ```bash
+
 curl -X POST http://localhost:8000/wardrobe/add \
+
   -F "user_id=priya" \
+
   -F "label=navy blue kurta" \
+
   -F "occasion_tags=wedding,festival" \
+
   -F "pattern=solid" \
+
   -F "image=@/path/to/kurta.jpg"
+
 ```
+
+
 
 ### Example: get outfit recommendations
 
+
+
 ```bash
+
 curl -X POST http://localhost:8000/recommend \
+
   -F "user_id=priya" \
+
   -F "occasion=wedding" \
+
   -F "style_preference=traditional"
+
 ```
 
+
+
 ---
+
+
 
 ## Running tests
 
+
+
 ```bash
+
 cd backend
 
+
+
 # Install test dependencies
+
 pip install -r ../tests/requirements-test.txt
 
+
+
 # Run all 78 tests
+
 pytest ../tests/ -v
 
+
+
 # Run by module
+
 pytest ../tests/test_cv.py -v             # 29 CV unit tests
+
 pytest ../tests/test_recommendation.py -v # 35 recommendation tests
+
 pytest ../tests/test_api.py -v            # 14 API integration tests
+
 ```
+
+
 
 Tests use synthetic in-memory images (no real photos needed) and redirect ChromaDB to a temp directory — production data is never touched.
 
+
+
 ---
+
+
 
 ## Outfit scoring
 
+
+
 Each recommended outfit combo is scored across four factors:
+
+
 
 | Factor | Weight | What it checks |
 |--------|--------|----------------|
@@ -205,11 +427,19 @@ Each recommended outfit combo is scored across four factors:
 | Color harmony | 20% | Whether top + bottom + shoes colors work well together |
 | Occasion match | 20% | Whether the item is tagged for the requested occasion |
 
+
+
 ---
+
+
 
 ## Environment variables
 
+
+
 Copy `.env.example` to `.env` and configure:
+
+
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -220,9 +450,15 @@ Copy `.env.example` to `.env` and configure:
 | `ALLOWED_ORIGINS` | `http://localhost` | Comma-separated CORS origins |
 | `MAX_UPLOAD_MB` | `20` | Max clothing photo size in MB |
 
+
+
 ---
 
+
+
 ## Tech stack
+
+
 
 | Layer | Technology |
 |-------|------------|
@@ -234,11 +470,14 @@ Copy `.env.example` to `.env` and configure:
 | Containerisation | Docker, docker-compose, nginx |
 | Testing | pytest, httpx, pytest-asyncio |
 
----
 
 
 ---
+
+
 
 ## License
+
+
 
 MIT
