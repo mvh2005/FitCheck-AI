@@ -51,6 +51,13 @@ export default function Wardrobe() {
 
   useEffect(() => { loadWardrobe() }, [loadWardrobe])
 
+  useEffect(() => {
+    if (userId && !loading) {
+      localStorage.setItem(`fitcheck_count_${userId}`, items.length)
+    }
+  }, [items.length, userId, loading])
+
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'image/*': [] }, maxFiles: 1,
     onDrop: ([file]) => { setImage(file); setPreview(URL.createObjectURL(file)) },

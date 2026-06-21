@@ -9,7 +9,10 @@ import cv2
 import numpy as np
 import mediapipe as mp
 
-mp_face_mesh = mp.solutions.face_mesh
+try:
+    mp_face_mesh = mp.solutions.face_mesh
+except (AttributeError, ImportError):
+    mp_face_mesh = None
 
 # Fitzpatrick scale ranges (based on lightness in LAB color space)
 FITZPATRICK_SCALE = [
@@ -68,6 +71,16 @@ def detect_skin_tone(image_bytes: bytes) -> dict:
     image_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
+    if mp_face_mesh is None:
+        return {
+            "hex": "#c68642",
+            "rgb": [198, 134, 66],
+            "fitzpatrick_type": 4,
+            "fitzpatrick_label": "Medium",
+            "lab_L": 55.0,
+            "error": "MediaPipe FaceMesh not available — using default skin tone",
+        }
+
     with mp_face_mesh.FaceMesh(
         static_image_mode=True,
         max_num_faces=1,
@@ -75,6 +88,7 @@ def detect_skin_tone(image_bytes: bytes) -> dict:
         min_detection_confidence=0.5,
     ) as face_mesh:
         results = face_mesh.process(image_rgb)
+
 
     if not results.multi_face_landmarks:
         return {

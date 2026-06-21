@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { imageUrl } from '../api'
+import { imageUrl } from '../utils/api'
 
 export default function ClothingItem({ item, onDelete }) {
   const [deleting, setDeleting] = useState(false)

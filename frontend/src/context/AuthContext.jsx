@@ -1,6 +1,10 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'
+import '../lib/firebase.js'
 
 const AuthContext = createContext(null)
+
+const auth = getAuth()
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -12,60 +16,66 @@ export function AuthProvider({ children }) {
     }
   })
 
-  const signup = useCallback((displayName, username, password) => {
-    const users = JSON.parse(localStorage.getItem('fitcheck_users') || '{}')
-    if (users[username.toLowerCase()]) {
-      throw new Error('Username already taken 😬')
+  const loginWithGoogle = useCallback(async () => {
+    const provider = new GoogleAuthProvider()
+    const result = await signInWithPopup(auth, provider)
+    const firebaseUser = result.user
+    const u = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+      photoURL: firebaseUser.photoURL,
+      username: firebaseUser.email.split('@')[0],
     }
-    const newUser = {
-      id: `${username.toLowerCase()}_${Date.now()}`,
-      username: username.toLowerCase(),
-      displayName,
-      createdAt: new Date().toISOString(),
-    }
-    users[username.toLowerCase()] = { ...newUser, password }
-    localStorage.setItem('fitcheck_users', JSON.stringify(users))
-    localStorage.setItem('fitcheck_auth_user', JSON.stringify(newUser))
-    localStorage.setItem('fitcheck_user_id', newUser.id)
-    setUser(newUser)
-    return newUser
+    setUser(u)
+    localStorage.setItem('fitcheck_auth_user', JSON.stringify(u))
+    localStorage.setItem('fitcheck_user_id', firebaseUser.uid.toLowerCase())
+    return u
   }, [])
 
-  const login = useCallback((username, password) => {
-    const users = JSON.parse(localStorage.getItem('fitcheck_users') || '{}')
-    const found = users[username.toLowerCase()]
-    if (!found || found.password !== password) {
-      throw new Error('Wrong username or password 👀')
-    }
-    const { password: _pw, ...userClean } = found
-    localStorage.setItem('fitcheck_auth_user', JSON.stringify(userClean))
-    localStorage.setItem('fitcheck_user_id', userClean.id)
-    setUser(userClean)
-    return userClean
-  }, [])
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('fitcheck_auth_user')
+  const logout = useCallback(async () => {
+    await signOut(auth)
     setUser(null)
+    localStorage.removeItem('fitcheck_auth_user')
+    localStorage.removeItem('fitcheck_user_id')
+    localStorage.removeItem('fitcheck_skin_tone')
+    localStorage.removeItem('fitcheck_gender')
+    localStorage.removeItem('fitcheck_body_type')
   }, [])
 
   const updateProfile = useCallback((updates) => {
     setUser(prev => {
+      if (!prev) return null
       const updated = { ...prev, ...updates }
       localStorage.setItem('fitcheck_auth_user', JSON.stringify(updated))
-      // also persist skin tone etc.
-      const users = JSON.parse(localStorage.getItem('fitcheck_users') || '{}')
-      if (users[updated.username]) {
-        const pw = users[updated.username].password
-        users[updated.username] = { ...updated, password: pw }
-        localStorage.setItem('fitcheck_users', JSON.stringify(users))
-      }
       return updated
     })
   }, [])
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const u = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          photoURL: firebaseUser.photoURL,
+          username: firebaseUser.email.split('@')[0],
+        }
+        setUser(u)
+        localStorage.setItem('fitcheck_auth_user', JSON.stringify(u))
+        localStorage.setItem('fitcheck_user_id', firebaseUser.uid.toLowerCase())
+      } else {
+        setUser(null)
+        localStorage.removeItem('fitcheck_auth_user')
+        localStorage.removeItem('fitcheck_user_id')
+      }
+    })
+    return unsubscribe
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loginWithGoogle, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )
@@ -76,3 +86,4 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
   return ctx
 }
+

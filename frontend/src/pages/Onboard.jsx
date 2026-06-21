@@ -4,6 +4,8 @@ import { useDropzone } from 'react-dropzone'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { onboardUser } from '../utils/api'
+import { useAuth } from '../context/AuthContext'
+
 
 const GENDERS = [
   { value: 'Male', emoji: '⚡' },
@@ -29,8 +31,9 @@ const stagger = {
 }
 
 export default function Onboard() {
+  const { user } = useAuth()
   const nav = useNavigate()
-  const [userId, setUserId] = useState('')
+  const [userId, setUserId] = useState(user?.username || '')
   const [gender, setGender] = useState('')
   const [bodyType, setBodyType] = useState('')
   const [selfie, setSelfie] = useState(null)

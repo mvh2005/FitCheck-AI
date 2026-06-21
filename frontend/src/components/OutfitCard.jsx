@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { imageUrl } from '../api'
+import { imageUrl } from '../utils/api'
 
 function ScoreBar({ label, value }) {
   return (
