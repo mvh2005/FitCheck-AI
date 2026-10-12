@@ -1,16 +1,48 @@
 {
   "expo": {
-    "name": "FitCheck",
+    "name": "FitCheck.ai",
     "slug": "fitcheck-ai",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
+    "scheme": "fitcheck",
+    "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
-    "splash": { "resizeMode": "contain", "backgroundColor": "#F5F0E8" },
-    "ios": { "supportsTablet": false, "bundleIdentifier": "ai.fitcheck.app" },
-    "android": { "adaptiveIcon": { "backgroundColor": "#F5F0E8" }, "package": "ai.fitcheck.app" },
+    "splash": {
+      "backgroundColor": "#F5F0E8"
+    },
     "plugins": [
-      ["expo-camera", { "cameraPermission": "FitCheck needs camera access for skin tone detection and clothing photos." }],
-      ["expo-image-picker", { "photosPermission": "FitCheck needs photo library access to upload clothing items." }]
-    ]
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FitCheck needs access to your photo library to add clothes to your wardrobe.",
+          "cameraPermission": "FitCheck needs camera access to photograph your clothes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FitCheck uses your location to fetch local weather for outfit recommendations."
+        }
+      ]
+    ],
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ai.fitcheck.app"
+    },
+    "android": {
+      "package": "ai.fitcheck.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F0E8"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

@@ -1,3 +1,4 @@
-import 'react-native-gesture-handler'
-import AppNavigator from './src/navigation/AppNavigator'
-export default function App() { return <AppNavigator /> }
+// This file is kept for backwards compatibility only.
+// The app entry point is now expo-router/entry (see package.json "main").
+// All screens are in the app/ directory.
+// This file is NOT used.
